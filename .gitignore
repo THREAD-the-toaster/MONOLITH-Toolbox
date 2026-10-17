@@ -1,0 +1,36 @@
+# Generated builds and packages
+/build*/
+/cmake-build-*/
+/dist/
+/out/
+/_CPack_Packages/
+CMakeCache.txt
+CMakeFiles/
+*.exe
+*.dll
+*.obj
+*.o
+*.pdb
+*.ilk
+*.a
+*.lib
+*.zip
+
+# Local IDE and user state
+/.idea/
+/.vs/
+/.vscode/
+CMakeUserPresets.json
+*.user
+*.suo
+*.log
+Thumbs.db
+.DS_Store
+
+# Credentials and signing material
+.env
+.env.*
+*.pfx
+*.p12
+*.key
+/node_modules/
