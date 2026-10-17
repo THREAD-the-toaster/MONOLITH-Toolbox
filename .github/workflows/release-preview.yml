@@ -1,4 +1,4 @@
-name: Publish initial preview
+name: Publish initial inDev
 
 on:
   push:
@@ -69,9 +69,9 @@ jobs:
         shell: bash
         run: |
           cat > release/NOTES.md <<'NOTES'
-          First public prototype of MONOLITH Toolbox for Windows x64, under the MIT license.
+          First public inDev build of MONOLITH Toolbox for Windows x64, under the MIT license.
 
-          **Unsigned preview:** SignPath Foundation signing is not active. Windows Smart App Control may block this executable. This release does not claim production readiness.
+          **Unsigned inDev build:** SignPath Foundation signing is not active. Windows Smart App Control may block this executable. This release does not claim production readiness.
 
           Includes the native dark interface, DPI-aware MONOLITH logo, SVG control artwork, local application icon lookup, sample catalogue filtering, template selection and local workspace creation.
 
@@ -84,14 +84,19 @@ jobs:
           The attached SHA256SUMS.txt contains the SHA-256 checksum of the ZIP. See the bundled privacy and code signing policies for details.
           NOTES
 
-      - name: Publish unsigned prerelease
+      - name: Publish or update unsigned inDev release
         shell: bash
         run: |
-          gh release create v0.1.0-preview.1 \
-            release/MONOLITH-Toolbox-0.1.0-preview.1-windows-x64-unsigned.zip \
-            release/SHA256SUMS.txt \
-            --target "$SOURCE_COMMIT" \
-            --prerelease \
-            --title 'MONOLITH Toolbox 0.1.0 Preview 1 (unsigned)' \
-            --notes-file release/NOTES.md
-
+          if gh release view v0.1.0-preview.1 --json tagName >/dev/null 2>&1; then
+            gh release edit v0.1.0-preview.1 \
+              --title 'MONOLITH Toolbox 0.1.0 inDev 1 (unsigned)' \
+              --notes-file release/NOTES.md
+          else
+            gh release create v0.1.0-preview.1 \
+              release/MONOLITH-Toolbox-0.1.0-preview.1-windows-x64-unsigned.zip \
+              release/SHA256SUMS.txt \
+              --target "$SOURCE_COMMIT" \
+              --prerelease \
+              --title 'MONOLITH Toolbox 0.1.0 inDev 1 (unsigned)' \
+              --notes-file release/NOTES.md
+          fi
