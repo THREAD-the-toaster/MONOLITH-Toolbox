@@ -1,0 +1,97 @@
+name: Publish initial preview
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release-preview.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.repository == 'THREAD-the-toaster/MONOLITH-Toolbox' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: '39020854527'
+      SOURCE_COMMIT: '651972dcc08e0e566ae4d046885568fd2dab17da'
+    steps:
+      - name: Verify successful source build
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_commit=$(gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" --jq '.head_sha')
+          conclusion=$(gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" --jq '.conclusion')
+          test "$actual_commit" = "$SOURCE_COMMIT"
+          test "$conclusion" = success
+
+      - name: Download verified Windows package
+        run: gh run download "$SOURCE_RUN" --name MONOLITH-Toolbox-windows-x64-unsigned --dir artifact
+
+      - name: Verify file hashes and prepare release assets
+        shell: python
+        run: |
+          from pathlib import Path
+          import hashlib, os, zipfile
+          root = Path('artifact')
+          package = root / 'MONOLITH-Toolbox-windows-x64-unsigned'
+          info = (package / 'BUILD-INFO.txt').read_text(encoding='utf-8-sig')
+          assert 'Source commit: ' + os.environ['SOURCE_COMMIT'] in info
+          assert 'Signing status: unsigned' in info
+          entries = (root / 'SHA256SUMS.txt').read_text(encoding='utf-8-sig').splitlines()
+          for entry in entries:
+              if not entry.strip():
+                  continue
+              digest, relative = entry.split('  ', 1)
+              file = package / relative.replace('\\', '/')
+              assert file.resolve().is_relative_to(package.resolve())
+              assert hashlib.sha256(file.read_bytes()).hexdigest().upper() == digest.upper(), relative
+          assert (package / 'MONOLITH_Toolbox.exe').is_file()
+          assert (package / 'assets/monolith.png').is_file()
+          assert (package / 'LICENSE').is_file()
+          output = Path('release')
+          output.mkdir()
+          archive = output / 'MONOLITH-Toolbox-0.1.0-preview.1-windows-x64-unsigned.zip'
+          with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as zipped:
+              for file in sorted(package.rglob('*')):
+                  if file.is_file():
+                      zipped.write(file, 'MONOLITH-Toolbox/' + file.relative_to(package).as_posix())
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          (output / 'SHA256SUMS.txt').write_text(digest + '  ' + archive.name + '\n', encoding='utf-8')
+
+      - name: Write preview notes
+        shell: bash
+        run: |
+          cat > release/NOTES.md <<'NOTES'
+          First public prototype of MONOLITH Toolbox for Windows x64, under the MIT license.
+
+          **Unsigned preview:** SignPath Foundation signing is not active. Windows Smart App Control may block this executable. This release does not claim production readiness.
+
+          Includes the native dark interface, DPI-aware MONOLITH logo, SVG control artwork, local application icon lookup, sample catalogue filtering, template selection and local workspace creation.
+
+          Launch, Install, search, sorting, downloads and updates are previews or not implemented. All templates currently generate a generic CMake/C++ starter. Tile order is not persistent.
+
+          Extract the ZIP and keep the executable beside its assets directory. No installer is required. Close the app and remove the extracted directory to uninstall; user-created workspaces remain where the user saved them.
+
+          Built by GitHub Actions using MSVC. Source commit: 651972dcc08e0e566ae4d046885568fd2dab17da. Build run: https://github.com/THREAD-the-toaster/MONOLITH-Toolbox/actions/runs/39020854527
+
+          The attached SHA256SUMS.txt contains the SHA-256 checksum of the ZIP. See the bundled privacy and code signing policies for details.
+          NOTES
+
+      - name: Publish unsigned prerelease
+        shell: bash
+        run: |
+          gh release create v0.1.0-preview.1 \
+            release/MONOLITH-Toolbox-0.1.0-preview.1-windows-x64-unsigned.zip \
+            release/SHA256SUMS.txt \
+            --target "$SOURCE_COMMIT" \
+            --prerelease \
+            --title 'MONOLITH Toolbox 0.1.0 Preview 1 (unsigned)' \
+            --notes-file release/NOTES.md
+
