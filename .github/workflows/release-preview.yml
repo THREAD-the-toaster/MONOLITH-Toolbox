@@ -84,15 +84,26 @@ jobs:
           The attached SHA256SUMS.txt contains the SHA-256 checksum of the ZIP. See the bundled privacy and code signing policies for details.
           NOTES
 
+      - name: Rename the existing release tag to inDev
+        shell: bash
+        run: |
+          if ! gh release view v0.1.0-indev.1 --json tagName >/dev/null 2>&1; then
+            if gh release view v0.1.0-preview.1 --json tagName >/dev/null 2>&1; then
+              gh release edit v0.1.0-preview.1 \
+                --tag v0.1.0-indev.1 \
+                --target "$SOURCE_COMMIT"
+            fi
+          fi
+
       - name: Publish or update unsigned inDev release
         shell: bash
         run: |
-          if gh release view v0.1.0-preview.1 --json tagName >/dev/null 2>&1; then
-            gh release edit v0.1.0-preview.1 \
+          if gh release view v0.1.0-indev.1 --json tagName >/dev/null 2>&1; then
+            gh release edit v0.1.0-indev.1 \
               --title 'MONOLITH Toolbox 0.1.0 inDev 1 (unsigned)' \
               --notes-file release/NOTES.md
           else
-            gh release create v0.1.0-preview.1 \
+            gh release create v0.1.0-indev.1 \
               release/MONOLITH-Toolbox-0.1.0-preview.1-windows-x64-unsigned.zip \
               release/SHA256SUMS.txt \
               --target "$SOURCE_COMMIT" \
